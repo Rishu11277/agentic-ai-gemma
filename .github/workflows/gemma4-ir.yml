@@ -42,16 +42,14 @@ jobs:
         mkdir -p onnx
         optimum-cli export onnx \
           --model model \
-          --task text-generation \
-          --output onnx
+          onnx
 
     - name: Convert ONNX → OpenVINO IR (Optimum)
       run: |
         mkdir -p openvino-ir
         optimum-cli export openvino \
           --model onnx \
-          --task text-generation \
-          --output openvino-ir
+          openvino-ir
 
     - name: Upload IR Artifacts
       uses: actions/upload-artifact@v4
