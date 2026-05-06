@@ -1,4 +1,4 @@
-name: Gemma-4-E4B → ONNX → OpenVINO IR
+name: Gemma-4-E4B → ONNX → OpenVINO IR (Optimum)
 
 on:
   workflow_dispatch:
@@ -20,7 +20,8 @@ jobs:
       run: |
         pip install -U pip
         pip install "transformers>=4.41.0" accelerate
-        pip install "openvino-dev>=2024.4.0"
+        pip install "optimum>=1.20.0" "optimum-intel>=1.17.0"
+        pip install "openvino>=2024.4.0"
         pip install huggingface_hub
 
     - name: HuggingFace Login
@@ -29,44 +30,28 @@ jobs:
       run: |
         hf auth login --token "$HF_TOKEN"
 
-    - name: Export Gemma-4-E4B to ONNX
+    - name: Download Gemma-4-E4B
+      run: |
+        mkdir -p model
+        hf download google/gemma-4-E4B \
+          --local-dir model \
+          --include "*.safetensors" "*.json"
+
+    - name: Export Gemma-4-E4B → ONNX (Optimum)
       run: |
         mkdir -p onnx
-        python3 - << 'EOF'
-from transformers import AutoModelForCausalLM
-import torch
-from pathlib import Path
+        optimum-cli export onnx \
+          --model model \
+          --task text-generation \
+          --output onnx
 
-model_id = "google/gemma-4-E4B"
-print(f"Loading model: {model_id}")
-model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16)
-
-model.eval()
-dummy = torch.randint(0, 100, (1, 32))  # [batch=1, seq=32]
-
-onnx_path = Path("onnx/model.onnx")
-onnx_path.parent.mkdir(parents=True, exist_ok=True)
-
-print(f"Exporting to ONNX: {onnx_path}")
-torch.onnx.export(
-    model,
-    (dummy,),
-    onnx_path.as_posix(),
-    input_names=["input_ids"],
-    output_names=["logits"],
-    opset_version=17,
-    dynamic_axes={"input_ids": {0: "batch", 1: "seq"},
-                  "logits": {0: "batch", 1: "seq"}},
-)
-print("ONNX export complete.")
-EOF
-
-    - name: Convert ONNX → OpenVINO IR (OVC CLI, no Python)
+    - name: Convert ONNX → OpenVINO IR (Optimum)
       run: |
         mkdir -p openvino-ir
-        echo "Converting onnx/model.onnx → OpenVINO IR in openvino-ir/"
-        ovc --input_model onnx/model.onnx --output_dir openvino-ir
-        echo "IR conversion complete."
+        optimum-cli export openvino \
+          --model onnx \
+          --task text-generation \
+          --output openvino-ir
 
     - name: Upload IR Artifacts
       uses: actions/upload-artifact@v4
