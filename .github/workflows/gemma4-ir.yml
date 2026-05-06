@@ -1,0 +1,45 @@
+name: Convert Gemma4 ONNX to OpenVINO IR
+
+on:
+  workflow_dispatch:
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        pip install -U pip
+        pip install huggingface_hub
+        pip install openvino-dev==2024.4.0
+
+    - name: HuggingFace Login
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: |
+        echo "$HF_TOKEN" | hf login --token
+
+    - name: Download Gemma-4-E4B-it ONNX
+      run: |
+        mkdir -p gemma4
+        hf download onnx-community/gemma-4-E4B-it-ONNX --local-dir gemma4
+
+    - name: Convert ONNX to OpenVINO IR
+      run: |
+        mkdir -p gemma4-ir
+        mo --input_model gemma4/model.onnx --output_dir gemma4-ir
+
+    - name: Upload IR Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: gemma4-openvino-ir
+        path: gemma4-ir
