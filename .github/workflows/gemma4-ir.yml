@@ -26,7 +26,8 @@ jobs:
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
-        echo "$HF_TOKEN" | hf auth login --token
+        hf auth login --token "$HF_TOKEN"
+
 
     - name: Download Gemma-4-E4B-it ONNX
       run: |
